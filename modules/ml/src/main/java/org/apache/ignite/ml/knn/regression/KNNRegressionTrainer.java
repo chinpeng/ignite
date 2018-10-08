@@ -19,14 +19,14 @@ package org.apache.ignite.ml.knn.regression;
 
 import org.apache.ignite.ml.dataset.DatasetBuilder;
 import org.apache.ignite.ml.knn.KNNUtils;
-import org.apache.ignite.ml.math.Vector;
 import org.apache.ignite.ml.math.functions.IgniteBiFunction;
+import org.apache.ignite.ml.math.primitives.vector.Vector;
 import org.apache.ignite.ml.trainers.SingleLabelDatasetTrainer;
 
 /**
  * kNN algorithm trainer to solve regression task.
  */
-public class KNNRegressionTrainer implements SingleLabelDatasetTrainer<KNNRegressionModel> {
+public class KNNRegressionTrainer extends SingleLabelDatasetTrainer<KNNRegressionModel> {
     /**
      * Trains model based on the specified data.
      *
@@ -37,6 +37,23 @@ public class KNNRegressionTrainer implements SingleLabelDatasetTrainer<KNNRegres
      */
     public <K, V> KNNRegressionModel fit(DatasetBuilder<K, V> datasetBuilder,
         IgniteBiFunction<K, V, Vector> featureExtractor, IgniteBiFunction<K, V, Double> lbExtractor) {
-        return new KNNRegressionModel(KNNUtils.buildDataset(datasetBuilder, featureExtractor, lbExtractor));
+
+        return updateModel(null, datasetBuilder, featureExtractor, lbExtractor);
+    }
+
+    /** {@inheritDoc} */
+    @Override public <K, V> KNNRegressionModel updateModel(KNNRegressionModel mdl, DatasetBuilder<K, V> datasetBuilder,
+        IgniteBiFunction<K, V, Vector> featureExtractor, IgniteBiFunction<K, V, Double> lbExtractor) {
+
+        KNNRegressionModel res = new KNNRegressionModel(KNNUtils.buildDataset(datasetBuilder,
+            featureExtractor, lbExtractor));
+        if (mdl != null)
+            res.copyStateFrom(mdl);
+        return res;
+    }
+
+    /** {@inheritDoc} */
+    @Override protected boolean checkState(KNNRegressionModel mdl) {
+        return true;
     }
 }

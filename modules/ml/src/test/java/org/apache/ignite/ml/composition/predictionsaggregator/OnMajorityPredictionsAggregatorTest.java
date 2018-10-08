@@ -22,10 +22,12 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
 public class OnMajorityPredictionsAggregatorTest {
+    /** Aggregator. */
     private PredictionsAggregator aggregator = new OnMajorityPredictionsAggregator();
 
     /** */
-    @Test public void testApply() {
+    @Test
+    public void testApply() {
         assertEquals(1.0, aggregator.apply(new double[]{1.0, 1.0, 1.0, 0.0}), 0.001);
     }
 }

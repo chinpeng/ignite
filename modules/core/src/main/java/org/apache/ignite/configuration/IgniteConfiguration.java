@@ -40,6 +40,7 @@ import org.apache.ignite.cluster.ClusterGroup;
 import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.compute.ComputeJob;
 import org.apache.ignite.compute.ComputeTask;
+import org.apache.ignite.spi.encryption.EncryptionSpi;
 import org.apache.ignite.events.Event;
 import org.apache.ignite.events.EventType;
 import org.apache.ignite.failure.FailureHandler;
@@ -214,6 +215,12 @@ public class IgniteConfiguration {
     /** Default timeout after which long query warning will be printed. */
     public static final long DFLT_LONG_QRY_WARN_TIMEOUT = 3000;
 
+    /** Default number of MVCC vacuum threads.. */
+    public static final int DFLT_MVCC_VACUUM_THREAD_CNT = 2;
+
+    /** Default time interval between MVCC vacuum runs in milliseconds. */
+    public static final long DFLT_MVCC_VACUUM_FREQUENCY = 5000;
+
     /** Optional local Ignite instance name. */
     private String igniteInstanceName;
 
@@ -361,6 +368,9 @@ public class IgniteConfiguration {
     /** Address resolver. */
     private AddressResolver addrRslvr;
 
+    /** Encryption SPI. */
+    private EncryptionSpi encryptionSpi;
+
     /** Cache configurations. */
     private CacheConfiguration[] cacheCfg;
 
@@ -487,6 +497,12 @@ public class IgniteConfiguration {
     /** Client connector configuration. */
     private ClientConnectorConfiguration cliConnCfg = ClientListenerProcessor.DFLT_CLI_CFG;
 
+    /** Size of MVCC vacuum thread pool. */
+    private int mvccVacuumThreadCnt = DFLT_MVCC_VACUUM_THREAD_CNT;
+
+    /** Time interval between vacuum runs (ms). */
+    private long mvccVacuumFreq = DFLT_MVCC_VACUUM_FREQUENCY;
+
     /** User authentication enabled. */
     private boolean authEnabled;
 
@@ -495,6 +511,9 @@ public class IgniteConfiguration {
 
     /** Communication failure resolver */
     private CommunicationFailureResolver commFailureRslvr;
+
+    /** SQL schemas to be created on node start. */
+    private String[] sqlSchemas;
 
     /**
      * Creates valid grid configuration with all default values.
@@ -522,6 +541,7 @@ public class IgniteConfiguration {
         failSpi = cfg.getFailoverSpi();
         loadBalancingSpi = cfg.getLoadBalancingSpi();
         indexingSpi = cfg.getIndexingSpi();
+        encryptionSpi = cfg.getEncryptionSpi();
 
         commFailureRslvr = cfg.getCommunicationFailureResolver();
 
@@ -532,6 +552,7 @@ public class IgniteConfiguration {
         addrRslvr = cfg.getAddressResolver();
         allResolversPassReq = cfg.isAllSegmentationResolversPassRequired();
         atomicCfg = cfg.getAtomicConfiguration();
+        authEnabled = cfg.isAuthenticationEnabled();
         autoActivation = cfg.isAutoActivationEnabled();
         binaryCfg = cfg.getBinaryConfiguration();
         dsCfg = cfg.getDataStorageConfiguration();
@@ -575,6 +596,8 @@ public class IgniteConfiguration {
         metricsLogFreq = cfg.getMetricsLogFrequency();
         metricsUpdateFreq = cfg.getMetricsUpdateFrequency();
         mgmtPoolSize = cfg.getManagementThreadPoolSize();
+        mvccVacuumThreadCnt = cfg.getMvccVacuumThreadCount();
+        mvccVacuumFreq = cfg.getMvccVacuumFrequency();
         netTimeout = cfg.getNetworkTimeout();
         nodeId = cfg.getNodeId();
         odbcCfg = cfg.getOdbcConfiguration();
@@ -594,6 +617,7 @@ public class IgniteConfiguration {
         sndRetryCnt = cfg.getNetworkSendRetryCount();
         sndRetryDelay = cfg.getNetworkSendRetryDelay();
         sqlConnCfg = cfg.getSqlConnectorConfiguration();
+        sqlSchemas = cfg.getSqlSchemas();
         sslCtxFactory = cfg.getSslContextFactory();
         storeSesLsnrs = cfg.getCacheStoreSessionListenerFactories();
         stripedPoolSize = cfg.getStripedPoolSize();
@@ -608,7 +632,6 @@ public class IgniteConfiguration {
         utilityCachePoolSize = cfg.getUtilityCacheThreadPoolSize();
         waitForSegOnStart = cfg.isWaitForSegmentOnStart();
         warmupClos = cfg.getWarmupClosure();
-        authEnabled = cfg.isAuthenticationEnabled();
     }
 
     /**
@@ -2044,6 +2067,28 @@ public class IgniteConfiguration {
     }
 
     /**
+     * Sets fully configured instances of {@link EncryptionSpi}.
+     *
+     * @param encryptionSpi Fully configured instance of {@link EncryptionSpi}.
+     * @see IgniteConfiguration#getEncryptionSpi()
+     * @return {@code this} for chaining.
+     */
+    public IgniteConfiguration setEncryptionSpi(EncryptionSpi encryptionSpi) {
+        this.encryptionSpi = encryptionSpi;
+
+        return this;
+    }
+
+    /**
+     * Gets fully configured encryption SPI implementations.
+     *
+     * @return Encryption SPI implementation.
+     */
+    public EncryptionSpi getEncryptionSpi() {
+        return encryptionSpi;
+    }
+
+    /**
      * Gets address resolver for addresses mapping determination.
      *
      * @return Address resolver.
@@ -2980,6 +3025,48 @@ public class IgniteConfiguration {
     }
 
     /**
+     * Returns number of MVCC vacuum threads.
+     *
+     * @return Number of MVCC vacuum threads.
+     */
+    public int getMvccVacuumThreadCount() {
+        return mvccVacuumThreadCnt;
+    }
+
+    /**
+     * Sets number of MVCC vacuum threads.
+     *
+     * @param mvccVacuumThreadCnt Number of MVCC vacuum threads.
+     * @return {@code this} for chaining.
+     */
+    public IgniteConfiguration setMvccVacuumThreadCount(int mvccVacuumThreadCnt) {
+        this.mvccVacuumThreadCnt = mvccVacuumThreadCnt;
+
+        return this;
+    }
+
+    /**
+     * Returns time interval between MVCC vacuum runs in milliseconds.
+     *
+     * @return Time interval between MVCC vacuum runs in milliseconds.
+     */
+    public long getMvccVacuumFrequency() {
+        return mvccVacuumFreq;
+    }
+
+    /**
+     * Sets time interval between MVCC vacuum runs in milliseconds.
+     *
+     * @param mvccVacuumFreq Time interval between MVCC vacuum runs in milliseconds.
+     * @return {@code this} for chaining.
+     */
+    public IgniteConfiguration setMvccVacuumFrequency(long mvccVacuumFreq) {
+        this.mvccVacuumFreq = mvccVacuumFreq;
+
+        return this;
+    }
+
+    /**
      * Returns {@code true} if user authentication is enabled for cluster. Otherwise returns {@code false}.
      * Default value is false; authentication is disabled.
      *
@@ -2997,6 +3084,35 @@ public class IgniteConfiguration {
      */
     public IgniteConfiguration setAuthenticationEnabled(boolean authEnabled) {
         this.authEnabled = authEnabled;
+
+        return this;
+    }
+
+    /**
+     * Gets SQL schemas to be created on node startup.
+     * <p>
+     * See {@link #setSqlSchemas(String...)} for more information.
+     *
+     * @return SQL schemas to be created on node startup.
+     */
+    public String[] getSqlSchemas() {
+        return sqlSchemas;
+    }
+
+    /**
+     * Sets SQL schemas to be created on node startup. Schemas are created on local node only and are not propagated
+     * to other cluster nodes. Created schemas cannot be dropped.
+     * <p>
+     * By default schema names are case-insensitive, i.e. {@code my_schema} and {@code My_Schema} represents the same
+     * object. Use quotes to enforce case sensitivity (e.g. {@code "My_Schema"}).
+     * <p>
+     * Property is ignored if {@code ignite-indexing} module is not in classpath.
+     *
+     * @param sqlSchemas SQL schemas to be created on node startup.
+     * @return {@code this} for chaining.
+     */
+    public IgniteConfiguration setSqlSchemas(String... sqlSchemas) {
+        this.sqlSchemas = sqlSchemas;
 
         return this;
     }
